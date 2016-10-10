@@ -37,8 +37,8 @@ def readTestingData():
         testing_data.append(a[:,2:].reshape(162))
     return np.array(testing_data).astype(np.float)
 
-def write_to_file(predict, filename):
-    with open(filename, "wb") as f:
+def write_to_file(predict):
+    with open("result.csv", "wb") as f:
         f.write('id,value\n')
         for i in xrange(predict.shape[0]):
             f.write('id_%d,%f\n'%(i,predict[i]))
@@ -98,7 +98,7 @@ def gradient_descent(X, Y, theta, learning_rate, iterations):
         #    break
         if it%1000 == 0 :
             print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
-            #print theta
+            print theta
             if validation_cost > last_cost:
                 print "Rebound"
                 break
@@ -128,7 +128,7 @@ def gradient_descent_v2(X, Y, theta, learning_rate, iterations):
             print("Iteration %5d | Cost: %f" %(it, cost))
         last_cost = cost
     
-    return theta
+    return theta, cost
 
 def gradient_descent_v1(X, Y, theta, learning_rate, iterations):
     num_points, num_features = X.shape
@@ -137,12 +137,13 @@ def gradient_descent_v1(X, Y, theta, learning_rate, iterations):
         loss = hypothesis - Y
         gradient = np.dot(X.T, loss)/num_points
         theta = theta - learning_rate * gradient
+        
         cost = loss.T.dot(loss) / (2.*num_points)
         #cost = np.sum(loss ** 2) / (2*num_points)
         if i%1000 == 0 :
             print("Iteration %5d | Cost: %f" %(i, cost))
     
-    return theta
+    return theta, cost
 
 def gradient_descent_v0(X, Y, learning_rate, iterations):
     num_points, num_features = X.shape
@@ -189,7 +190,6 @@ def run():
     bias = np.array([np.ones(num_points)]).T
     X = np.concatenate((X, bias), axis=1)
     theta = np.zeros(num_features+1)
-    #theta = gradient_descent_v1(X, Y, theta, learning_rate, iterations)
     theta = gradient_descent(X, Y, theta, learning_rate, iterations)
     
     testing_data = readTestingData()
@@ -199,8 +199,10 @@ def run():
 
     bias = np.array([np.ones(num_points)]).T
     X_testing = np.concatenate((normalized_testing_data, bias), axis=1)
+    
     predict = (X_testing).dot(theta)
-    write_to_file(predict, "linear_regression.csv")
+    
+    write_to_file(predict)
 
 if __name__ == '__main__':
     run()
