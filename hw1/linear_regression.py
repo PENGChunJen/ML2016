@@ -46,8 +46,8 @@ def normalize_feature(X):
     mean_r = [] 
     std_r = []
     X_norm = X
-    n_c = X.shape[1]
-    for i in range(n_c):
+    num_features = X.shape[1]
+    for i in xrange(num_features):
         m = np.mean(X[:,i])
         s = np.std(X[:,i])
         mean_r.append(m)
@@ -61,44 +61,72 @@ def compute_cost(X, Y, theta):
     J = (1.0 /(2*m)) * errors.T.dot(errors)
     return J
 
-def gradient_descent(X, Y, theta, alpha, iterations):
-    m = X.shape[0]
+def gradient_descent(X, Y, theta, learning_rate, iterations):
+    num_points, num_features = X.shape
     for i in xrange(iterations):
         hypothesis = X.dot(theta)
         loss = hypothesis - Y
-        cost = loss.T.dot(loss) / (2*m) 
+        cost = loss.T.dot(loss) / (2.*num_points)
         #cost = np.sum(loss ** 2) / (2*m)
         #print("Iteration %5d | Cost: %f" %(i, cost))
         if i%1000 == 0 :
             print("Iteration %5d | Cost: %f" %(i, cost))
-        gradient = np.dot(X.T, loss)/m
-        theta = theta - alpha * gradient
+        gradient = np.dot(X.T, loss)/num_points
+        theta = theta - learning_rate * gradient
     return theta, cost
 
-def gradient_descent_v0(X, Y, theta, alpha, iterations):
-    w_grad = np.zeros(X.shape[1])
-    b_grad = np.zeros(X.shape[1])
-    N = X.shape[0]
+def gradient_descent_v0(X, Y, learning_rate, iterations):
+    num_points, num_features = X.shape
+    
+    w = np.zeros(num_features)
+    b = np.zeros(num_features)
+    w_grad_acc = np.zeros(num_features)
+    b_grad_acc = np.zeros(num_features)
+
     for i in xrange(iterations):
-        b = b - 2
+        w_grad = np.zeros(num_features)
+        b_grad = np.zeros(num_features)
+        
+        for n in xrange(num_points):
+            w_grad = w_grad - 2.0*(Y[n] - b - w*X[n,:]) * X[n,:]  
+            b_grad = b_grad - 2.0*(Y[n] - b - w*X[n,:])
+        
+        w_grad_acc += w_grad**2
+        b_grad_acc += b_grad**2
+        
+        b = b - learning_rate/np.sqrt(b_grad_acc) * b_grad
+        w = w - learning_rate/np.sqrt(w_grad_acc) * w_grad
+   
+        error =  0
+        for n in xrange(num_points):
+            error += (Y[n] - (w*X[n,:] + b)) ** 2
+        error = sum(error)/float(num_points)
+        
+        #if i%1000 == 0 :
+        print("Iteration %5d | Cost: %f" %(i, error))
+    
+    return w, b
 
 def run():
     iterations = 10001
     learning_rate = 0.01
     X, Y = readTrainingData()
-    theta = np.zeros(X.shape[1])
+    print X.shape, Y.shape
+    #w, b = gradient_descent_v0(X, Y, learning_rate, iterations)
+
+    num_points, num_features = X.shape
     X, mean_r, std_r = normalize_feature(X)
-    
-    theta,cost = gradient_descent(X, Y, theta, learning_rate, iterations)
-    print("Cost: %f" % cost)
+    bias = np.array([np.ones(num_points)]).T
+    X = np.concatenate((X, bias), axis=1)
+    theta = np.zeros(num_features+1)
+    theta, cost = gradient_descent(X, Y, theta, learning_rate, iterations)
     
     testing_data = readTestingData()
-    print 'test\n',testing_data
-    print 'mean\n',mean_r
-    print 'result\n',np.subtract(testing_data,mean_r)
-    predict = ((testing_data-mean_r)/std_r).dot(theta)
-    #predict = testing_data.dot(theta)
-    #print predict.shape[0]
+    num_points, num_features = testing_data.shape
+    normalized_testing_data = (testing_data - mean_r)/std_r
+    bias = np.array([np.ones(num_points)]).T
+    X_testing = np.concatenate((normalized_testing_data, bias), axis=1)
+    predict = (X_testing).dot(theta)
     write_to_file(predict)
 
 if __name__ == '__main__':
