@@ -63,16 +63,39 @@ def compute_cost(X, Y, theta):
 
 def gradient_descent(X, Y, theta, learning_rate, iterations):
     num_points, num_features = X.shape
+    delta = 0.000001
+    last_cost = float('Inf')
     for i in xrange(iterations):
         hypothesis = X.dot(theta)
         loss = hypothesis - Y
-        cost = loss.T.dot(loss) / (2.*num_points)
-        #cost = np.sum(loss ** 2) / (2*m)
-        #print("Iteration %5d | Cost: %f" %(i, cost))
-        if i%1000 == 0 :
-            print("Iteration %5d | Cost: %f" %(i, cost))
         gradient = np.dot(X.T, loss)/num_points
         theta = theta - learning_rate * gradient
+        
+        cost = loss.T.dot(loss) / (2.*num_points)
+        #cost = np.sum(loss ** 2) / (2*num_points)
+        if abs(last_cost - cost) < delta:
+            print 'last_cost:', last_cost, 'cost:', cost
+            print("Converge at Iteration %5d | Cost: %f" %(i, cost))
+            break
+        if i%1000 == 0 :
+            print("Iteration %5d | Cost: %f" %(i, cost))
+        last_cost = cost
+    
+    return theta, cost
+
+def gradient_descent_v1(X, Y, theta, learning_rate, iterations):
+    num_points, num_features = X.shape
+    for i in xrange(iterations):
+        hypothesis = X.dot(theta)
+        loss = hypothesis - Y
+        gradient = np.dot(X.T, loss)/num_points
+        theta = theta - learning_rate * gradient
+        
+        cost = loss.T.dot(loss) / (2.*num_points)
+        #cost = np.sum(loss ** 2) / (2*num_points)
+        if i%1000 == 0 :
+            print("Iteration %5d | Cost: %f" %(i, cost))
+    
     return theta, cost
 
 def gradient_descent_v0(X, Y, learning_rate, iterations):
@@ -102,13 +125,13 @@ def gradient_descent_v0(X, Y, learning_rate, iterations):
             error += (Y[n] - (w*X[n,:] + b)) ** 2
         error = sum(error)/float(num_points)
         
-        #if i%1000 == 0 :
-        print("Iteration %5d | Cost: %f" %(i, error))
+        if i%100 == 0 :
+            print("Iteration %5d | Cost: %f" %(i, error))
     
     return w, b
 
 def run():
-    iterations = 10001
+    iterations = 100001
     learning_rate = 0.01
     X, Y = readTrainingData()
     print X.shape, Y.shape
@@ -124,13 +147,13 @@ def run():
     testing_data = readTestingData()
     num_points, num_features = testing_data.shape
     normalized_testing_data = (testing_data - mean_r)/std_r
+
     bias = np.array([np.ones(num_points)]).T
     X_testing = np.concatenate((normalized_testing_data, bias), axis=1)
+    
     predict = (X_testing).dot(theta)
+    
     write_to_file(predict)
 
 if __name__ == '__main__':
     run()
-    a = np.array([[1,2],[3,3]])
-    b = np.array([[1,1],[2,2]])
-    print np.subtract(a,b)
