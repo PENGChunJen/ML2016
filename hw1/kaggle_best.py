@@ -37,8 +37,8 @@ def readTestingData():
         testing_data.append(a[:,2:].reshape(162))
     return np.array(testing_data).astype(np.float)
 
-def write_to_file(predict):
-    with open("result.csv", "wb") as f:
+def write_to_file(predict, filename):
+    with open(filename, "wb") as f:
         f.write('id,value\n')
         for i in xrange(predict.shape[0]):
             f.write('id_%d,%f\n'%(i,predict[i]))
@@ -62,8 +62,10 @@ def compute_cost(X, Y, theta):
     J = (1.0 /(2*m)) * errors.T.dot(errors)
     return J
 
-def cross_validation(X, Y):
-    batch_size = 240 
+def cross_validation(X, Y, it):
+    batch_size = 1000 
+    num_points, num_features = X.shape
+     
     validation_data = X[:batch_size,:] 
     validation_value = Y[:batch_size]
     
@@ -88,8 +90,8 @@ def gradient_descent(X, Y, theta, learning_rate, iterations):
     num_points, num_features = X.shape
     delta = 0.000001
     last_cost = float('Inf')
-    train_data, train_value, validation_data, validation_value = cross_validation(X, Y)
     for it in xrange(iterations):
+        train_data, train_value, validation_data, validation_value = cross_validation(X, Y, it)
         theta, train_cost, validation_cost = run_gradient_descent(train_data, train_value, validation_data, validation_value, theta, learning_rate)
         
         #if abs(last_cost - cost) < delta:
@@ -98,10 +100,11 @@ def gradient_descent(X, Y, theta, learning_rate, iterations):
         #    break
         if it%1000 == 0 :
             print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
-            print theta
-            if validation_cost > last_cost:
-                print "Rebound"
-                break
+            #print theta
+        if validation_cost > last_cost:
+            print "Rebound"
+            print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
+            break
 
         last_cost = validation_cost
     
@@ -178,10 +181,10 @@ def gradient_descent_v0(X, Y, learning_rate, iterations):
     return w, b
 
 def run():
-    iterations = 100001
-    learning_rate = 0.01
+    iterations = 1000001
+    learning_rate = 0.001
     X, Y = readTrainingData()
-    print X.shape, Y.shape
+    #print X.shape, Y.shape
     #w, b = gradient_descent_v0(X, Y, learning_rate, iterations)
 
     num_points, num_features = X.shape
@@ -202,7 +205,7 @@ def run():
     
     predict = (X_testing).dot(theta)
     
-    write_to_file(predict)
+    write_to_file(predict, "kaggle_best.csv")
 
 if __name__ == '__main__':
     run()

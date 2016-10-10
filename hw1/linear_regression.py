@@ -63,7 +63,7 @@ def compute_cost(X, Y, theta):
     return J
 
 def cross_validation(X, Y):
-    batch_size = 240 
+    batch_size = 1000 
     validation_data = X[:batch_size,:] 
     validation_value = Y[:batch_size]
     
@@ -101,6 +101,7 @@ def gradient_descent(X, Y, theta, learning_rate, iterations):
             #print theta
             if validation_cost > last_cost:
                 print "Rebound"
+                print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
                 break
 
         last_cost = validation_cost
