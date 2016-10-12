@@ -168,16 +168,16 @@ def gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learni
         theta, train_cost, validation_cost = run_gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate)
         
         if it%1000 == 0 :
-            #print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
+            print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
             #print theta
             if abs(last_cost - validation_cost) < delta:
                 #print 'last_cost:', last_cost, 'cost:', validation_cost
-                #print("Converge at Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
+                print("Converge at Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
                 break
 
         if it > 1000 and validation_cost > last_cost:
             #print "Rebound"
-            #print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
+            print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
             final_it = it
             break
 
@@ -209,9 +209,12 @@ def cross_validation(X, Y, learning_rate, iterations, fold = 5):
         theta, train_cost, validation_cost, final_it = gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate, iterations)
         avg_theta += theta     
         avg_cost += validation_cost
-    #print 'Average cost:', avg_cost/fold
+        if fold == -1:
+            return theta, validation_cost
+
+    print 'Average cost:', avg_cost/fold
     theta = avg_theta/fold
-    return theta, avg_cost
+    return theta
 
 def expand_as_polynomial(X, test_X, p =  2):
     num_points, num_features = X.shape
@@ -228,7 +231,13 @@ def expand_as_polynomial(X, test_X, p =  2):
     
     return X, test_X
 
-def sequential_forward_selection(X, Y, test_X):
+def sequential_forward_selection(X, Y, test_X, features = None):
+    if features is not None:
+        ff = []
+        for row_f in features:
+            ff.extend(range(9*row_f,9*(row_f+1)))
+        return X[:,ff], test_X[:,ff]
+
     # Parameter setting
     max_iterations = 1000001
     learning_rate = 0.01
@@ -249,7 +258,7 @@ def sequential_forward_selection(X, Y, test_X):
             ff = []
             for row_f in f:
                 ff.extend(range(9*row_f,9*(row_f+1)))
-            print 'ff:', ff 
+            #print 'ff:', ff 
             '''
             if len(f) == 1:
                 feature_X = X[:,i].reshape(num_points,1)
@@ -257,7 +266,7 @@ def sequential_forward_selection(X, Y, test_X):
                 feature_X = X[:,f]
             '''
             feature_X = X[:,ff]
-            print feature_X.shape
+            #print feature_X.shape
 
             theta, cost = cross_validation(feature_X, Y, learning_rate, max_iterations, fold)
             feature_costs.append({'feature':f, 'cost':cost})
@@ -266,22 +275,24 @@ def sequential_forward_selection(X, Y, test_X):
         sorted_list = sorted(feature_costs, key = lambda k: k['cost']) 
         cost = sorted_list[0]['cost']
         selected_features = sorted_list[0]['feature']
-        print 'feature:', selected_features, 'cost:',cost
+        print '\nCurrently selected inputs: feature:', selected_features, 'cost:',cost, '\n'
     return X, test_X
 
 def run():
     # Parameter setting
-    max_iterations = 100001
+    max_iterations = 10000001
     learning_rate = 0.01
-    fold = 5
+    fold = 10 
 
     X, Y = readTrainingData()
     test_X = readTestingData()
     X, test_X = expand_as_polynomial(X, test_X, 1)
-    X, test_X = sequential_forward_selection(X, Y, test_X)
 
+    #selected_features = None
+    selected_features = [0,10,9,13,12,4,2,8,3,17]
+    selected_features = [0,10,9,13,12,4,2,8]
+    X, test_X = sequential_forward_selection(X, Y, test_X, selected_features)
     theta = cross_validation(X, Y, learning_rate, max_iterations, fold)
-   
     predict = (test_X).dot(theta)
     write_to_file(predict, "kaggle_best.csv")
 
