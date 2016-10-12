@@ -56,97 +56,6 @@ def normalize_feature(X):
         X_norm[:,i] = (X_norm[:,i]-m)/s
     return X_norm, np.array([mean_r]), np.array([std_r])
 
-def compute_cost(X, Y, theta):
-    m = Y.size
-    error = X.dot(theta) - Y
-    J = (1.0 /(2*m)) * errors.T.dot(errors)
-    return J
-
-def cross_validation(X, Y, it):
-    batch_size = 1000 
-    num_points, num_features = X.shape
-     
-    validation_data = X[:batch_size,:] 
-    validation_value = Y[:batch_size]
-    
-    train_data = X[batch_size:, :]
-    train_value = Y[batch_size:] 
-    return train_data, train_value, validation_data, validation_value
-
-def run_gradient_descent(train_data, train_value, validation_data, validation_value, theta, learning_rate):
-    num_points, num_features = train_data.shape
-    hypothesis = train_data.dot(theta)
-    loss = hypothesis - train_value 
-    gradient = np.dot(train_data.T, loss)/num_points
-    theta = theta - learning_rate * gradient
-    train_cost = loss.T.dot(loss) / (2.*num_points)
-
-    num_points, num_features = validation_data.shape
-    validation_loss = validation_data.dot(theta) - validation_value
-    validation_cost = validation_loss.T.dot(validation_loss) / (2.*num_points)
-    return theta, train_cost, validation_cost
-
-def gradient_descent(X, Y, theta, learning_rate, iterations):
-    num_points, num_features = X.shape
-    delta = 0.000001
-    last_cost = float('Inf')
-    for it in xrange(iterations):
-        train_data, train_value, validation_data, validation_value = cross_validation(X, Y, it)
-        theta, train_cost, validation_cost = run_gradient_descent(train_data, train_value, validation_data, validation_value, theta, learning_rate)
-        
-        #if abs(last_cost - cost) < delta:
-        #    print 'last_cost:', last_cost, 'cost:', cost
-        #    print("Converge at Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
-        #    break
-        if it%1000 == 0 :
-            print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
-            #print theta
-        if validation_cost > last_cost:
-            print "Rebound"
-            print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
-            break
-
-        last_cost = validation_cost
-    
-    return theta
-
-
-def gradient_descent_v2(X, Y, theta, learning_rate, iterations):
-    num_points, num_features = X.shape
-    delta = 0.000001
-    last_cost = float('Inf')
-    for it in xrange(iterations):
-        hypothesis = X.dot(theta)
-        loss = hypothesis - Y 
-        gradient = np.dot(X.T, loss)/num_points
-        theta = theta - learning_rate * gradient
-        
-        cost = loss.T.dot(loss) / (2.*num_points)
-        #cost = np.sum(loss ** 2) / (2*num_points)
-        if abs(last_cost - cost) < delta:
-            print 'last_cost:', last_cost, 'cost:', cost
-            print("Converge at Iteration %5d | Cost: %f" %(it, cost))
-            break
-        if it%1000 == 0 :
-            print("Iteration %5d | Cost: %f" %(it, cost))
-        last_cost = cost
-    
-    return theta, cost
-
-def gradient_descent_v1(X, Y, theta, learning_rate, iterations):
-    num_points, num_features = X.shape
-    for i in xrange(iterations):
-        hypothesis = X.dot(theta)
-        loss = hypothesis - Y
-        gradient = np.dot(X.T, loss)/num_points
-        theta = theta - learning_rate * gradient
-        
-        cost = loss.T.dot(loss) / (2.*num_points)
-        #cost = np.sum(loss ** 2) / (2*num_points)
-        if i%1000 == 0 :
-            print("Iteration %5d | Cost: %f" %(i, cost))
-    
-    return theta, cost
 
 def gradient_descent_v0(X, Y, learning_rate, iterations):
     num_points, num_features = X.shape
@@ -180,9 +89,104 @@ def gradient_descent_v0(X, Y, learning_rate, iterations):
     
     return w, b
 
+def gradient_descent_v1(X, Y, theta, learning_rate, iterations):
+    num_points, num_features = X.shape
+    for i in xrange(iterations):
+        hypothesis = X.dot(theta)
+        loss = hypothesis - Y
+        gradient = np.dot(X.T, loss)/num_points
+        print theta.shape, gradient.shape
+        theta = theta - learning_rate * gradient
+        
+        cost = loss.T.dot(loss) / (2.*num_points)
+        #cost = np.sum(loss ** 2) / (2*num_points)
+        if i%1000 == 0 :
+            print("Iteration %5d | Cost: %f" %(i, cost))
+    
+    return theta, cost
+
+def gradient_descent_v2(X, Y, theta, learning_rate, iterations):
+    num_points, num_features = X.shape
+    delta = 0.000001
+    last_cost = float('Inf')
+    for it in xrange(iterations):
+        hypothesis = X.dot(theta)
+        loss = hypothesis - Y 
+        gradient = np.dot(X.T, loss)/num_points
+        theta = theta - learning_rate * gradient
+        
+        cost = loss.T.dot(loss) / (2.*num_points)
+        #cost = np.sum(loss ** 2) / (2*num_points)
+        if abs(last_cost - cost) < delta:
+            print 'last_cost:', last_cost, 'cost:', cost
+            print("Converge at Iteration %5d | Cost: %f" %(it, cost))
+            break
+        if it%1000 == 0 :
+            print("Iteration %5d | Cost: %f" %(it, cost))
+        last_cost = cost
+    
+    return theta, cost
+
+def compute_cost(X, Y, theta):
+    m = Y.size
+    error = X.dot(theta) - Y
+    J = (1.0 /(2*m)) * error.T.dot(error)
+    return J
+
+def cross_validation(X, Y, fold):
+    batch_size = 1000 
+    num_points, num_features = X.shape
+     
+    validation_data = X[:batch_size,:] 
+    validation_value = Y[:batch_size]
+    
+    train_data = X[batch_size:, :]
+    train_value = Y[batch_size:] 
+    return train_data, train_value, validation_data, validation_value
+
+def run_gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate):
+    num_points, num_features = train_X.shape
+    hypothesis = train_X.dot(theta)
+    loss = hypothesis - train_Y
+    gradient = np.dot(train_X.T, loss)/num_points
+    theta = theta - learning_rate * gradient
+    train_cost = loss.T.dot(loss) / (2.*num_points)
+
+    validation_cost = compute_cost(validation_X, validation_Y, theta)
+    return theta, train_cost, validation_cost
+
+def gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate=0.01, iterations=10001):
+    #num_points, num_features = train_X.shape
+    delta = 0.000001
+    last_cost = float('Inf')
+    for it in xrange(iterations):
+        theta, train_cost, validation_cost = run_gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate)
+        
+        #if abs(last_cost - cost) < delta:
+        #    print 'last_cost:', last_cost, 'cost:', cost
+        #    print("Converge at Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
+        #    break
+        if it%1000 == 0 :
+            print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
+            #print theta
+        if validation_cost > last_cost:
+            print "Rebound"
+            print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
+            break
+
+        last_cost = validation_cost
+    
+    return theta, train_cost, validation_cost
+
+def batch_gradient_descent(X, Y, theta, learning_rate, iterations):
+    train_X, train_Y, validation_X, validation_Y= cross_validation(X, Y, fold = 2)
+
+    theta, train_cost, validation_cost = gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate, iterations)
+    return theta
+
 def run():
-    iterations = 1000001
-    learning_rate = 0.001
+    iterations = 100001
+    learning_rate = 0.01
     X, Y = readTrainingData()
     #print X.shape, Y.shape
     #w, b = gradient_descent_v0(X, Y, learning_rate, iterations)
@@ -193,7 +197,9 @@ def run():
     bias = np.array([np.ones(num_points)]).T
     X = np.concatenate((X, bias), axis=1)
     theta = np.zeros(num_features+1)
-    theta = gradient_descent(X, Y, theta, learning_rate, iterations)
+    print np.polyfit(X, Y, 2)
+    '''
+    theta = batch_gradient_descent(X, Y, theta, learning_rate, iterations)
     
     testing_data = readTestingData()
     #print testing_data.shape
@@ -206,6 +212,7 @@ def run():
     predict = (X_testing).dot(theta)
     
     write_to_file(predict, "kaggle_best.csv")
+    '''
 
 if __name__ == '__main__':
     run()
