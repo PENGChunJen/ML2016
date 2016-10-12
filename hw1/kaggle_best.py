@@ -136,16 +136,17 @@ def compute_cost(X, Y, theta):
     J = (1.0 /(2*m)) * error.T.dot(error)
     return J
 
-def cross_validation(X, Y, fold):
-    batch_size = 500 
+def split_to_N_fold(X, Y, fold):
     num_points, num_features = X.shape
-     
-    validation_data = X[:batch_size,:] 
-    validation_value = Y[:batch_size]
-    
-    train_data = X[batch_size:, :]
-    train_value = Y[batch_size:] 
-    return train_data, train_value, validation_data, validation_value
+    batch_size = num_points / fold 
+    batch = [] 
+    for i in xrange(fold):
+        validation_data = X[batch_size*i:batch_size*(i+1),:] 
+        validation_value = Y[batch_size*i:batch_size*(i+1)]
+        train_data = np.concatenate((X[:(batch_size*i),:],X[batch_size*(i+1):,:]))
+        train_value = np.concatenate((Y[:batch_size*i],Y[batch_size*(i+1):]))
+        batch.append((train_data, train_value, validation_data, validation_value)) 
+    return batch 
 
 def run_gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate):
     num_points, num_features = train_X.shape
@@ -162,6 +163,7 @@ def gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learni
     #num_points, num_features = train_X.shape
     delta = 0.000001
     last_cost = float('Inf')
+    final_it = 0
     for it in xrange(iterations):
         theta, train_cost, validation_cost = run_gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate)
         
@@ -175,16 +177,31 @@ def gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learni
         if it > 1000 and validation_cost > last_cost:
             print "Rebound"
             print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
+            final_it = it
             break
 
         last_cost = validation_cost
+
     
-    return theta, train_cost, validation_cost
+    return theta, train_cost, validation_cost, final_it
 
-def batch_gradient_descent(X, Y, theta, learning_rate, iterations):
-    train_X, train_Y, validation_X, validation_Y= cross_validation(X, Y, fold = 2)
+def cross_validation(X, Y, learning_rate, iterations, fold = 5):
+    batch = split_to_N_fold(X, Y, fold)
+    num_points, num_features = X.shape
+    avg_theta = np.zeros(num_features)
+    avg_cost = 0.
+    for i in xrange(len(batch)):
+        theta = np.zeros(num_features)
+        
+        train_X, train_Y, validation_X, validation_Y = batch[i]
+        print X.shape, train_X.shape, validation_X.shape
+        print Y.shape, train_Y.shape, validation_Y.shape 
 
-    theta, train_cost, validation_cost = gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate, iterations)
+        theta, train_cost, validation_cost, final_it = gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate, iterations)
+        avg_theta += theta     
+        avg_cost += validation_cost
+    print 'Average cost:', avg_cost/fold
+    theta = avg_theta/fold
     return theta
 
 def expand_as_polynomial(X, test_X, p =  2):
@@ -195,27 +212,22 @@ def expand_as_polynomial(X, test_X, p =  2):
     for i in xrange(1,p+1):
         X_poly = np.concatenate((X_poly, np.power(X,i)), axis=1)
         test_X_poly = np.concatenate((test_X_poly, np.power(test_X,i)), axis=1)
-        
+
     X, mean_r, std_r = normalize_feature(X_poly)
     test_X = (test_X_poly - mean_r)/std_r
-        
-    num_points, num_features = X.shape
-    theta = np.zeros(num_features)
-
-    return X, test_X, theta 
+    
+    return X, test_X
 
 def run():
-    iterations = 100001
+    iterations = 1000001
     learning_rate = 0.001
+    fold = 5
+    
     X, Y = readTrainingData()
     test_X = readTestingData()
-    #print X.shape, Y.shape
-    #w, b = gradient_descent_v0(X, Y, learning_rate, iterations)
+    X, test_X = expand_as_polynomial(X, test_X, 1)
 
-    X, test_X, theta = expand_as_polynomial(X, test_X, 2)
-   
-
-    theta = batch_gradient_descent(X, Y, theta, learning_rate, iterations)
+    theta = cross_validation(X, Y, learning_rate, iterations, fold)
    
     predict = (test_X).dot(theta)
     write_to_file(predict, "kaggle_best.csv")
