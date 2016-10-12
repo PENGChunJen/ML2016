@@ -169,10 +169,8 @@ def gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learni
         
         if it%1000 == 0 :
             print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
-            #print theta
             if abs(last_cost - validation_cost) < delta:
-                #print 'last_cost:', last_cost, 'cost:', validation_cost
-                print("Converge at Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
+                print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
                 break
 
         if it > 1000 and validation_cost > last_cost:
@@ -200,6 +198,7 @@ def cross_validation(X, Y, learning_rate, iterations, fold = 5):
     avg_theta = np.zeros(num_features)
     avg_cost = 0.
     for i in xrange(len(batch)):
+        print 'Fold', i
         theta = np.zeros(num_features)
         
         train_X, train_Y, validation_X, validation_Y = batch[i]
@@ -212,9 +211,10 @@ def cross_validation(X, Y, learning_rate, iterations, fold = 5):
         if fold == -1:
             return theta, validation_cost
 
-    print 'Average cost:', avg_cost/fold
+    #print fold, 'folds cross-validation average cost:', avg_cost/fold
     theta = avg_theta/fold
-    return theta
+    avg_cost = avg_cost/fold
+    return theta, avg_cost
 
 def expand_as_polynomial(X, test_X, p =  2):
     num_points, num_features = X.shape
@@ -281,19 +281,30 @@ def sequential_forward_selection(X, Y, test_X, features = None):
 def run():
     # Parameter setting
     max_iterations = 10000001
-    learning_rate = 0.01
+    learning_rate = 0.001
     fold = 10 
 
     X, Y = readTrainingData()
     test_X = readTestingData()
     X, test_X = expand_as_polynomial(X, test_X, 1)
 
+    # SFS
     #selected_features = None
-    selected_features = [0,10,9,13,12,4,2,8,3,17]
-    selected_features = [0,10,9,13,12,4,2,8]
-    X, test_X = sequential_forward_selection(X, Y, test_X, selected_features)
-    theta = cross_validation(X, Y, learning_rate, max_iterations, fold)
-    predict = (test_X).dot(theta)
+    #selected_X, selected_test_X = sequential_forward_selection(X, Y, test_X, selected_features)
+
+    # 10 fold cross-validation feature selection
+    #selected_features = [0,10,9,13,12,4,2,8,3,17]
+    #while len(selected_features) > 0:
+    #    selected_X, selected_test_X = sequential_forward_selection(X, Y, test_X, selected_features)
+    #    avg_theta, avg_cost = cross_validation(selected_X, Y, learning_rate, max_iterations, fold)
+    #    print '10 fold cross-validation cost:', avg_cost, selected_features
+    #    selected_features.pop()
+    
+    selected_features = [0,10,9,13,12,4]
+    selected_X, selected_test_X = sequential_forward_selection(X, Y, test_X, selected_features)
+    avg_theta, avg_cost = cross_validation(selected_X, Y, learning_rate, max_iterations, fold)
+    print '10 fold cross-validation cost:', avg_cost, selected_features
+    predict = (selected_test_X).dot(avg_theta)
     write_to_file(predict, "kaggle_best.csv")
 
 if __name__ == '__main__':
