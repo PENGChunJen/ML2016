@@ -137,7 +137,7 @@ def compute_cost(X, Y, theta):
     return J
 
 def cross_validation(X, Y, fold):
-    batch_size = 240 
+    batch_size = 500 
     num_points, num_features = X.shape
      
     validation_data = X[:batch_size,:] 
