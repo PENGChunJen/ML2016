@@ -51,6 +51,9 @@ def normalize_feature(X):
     for i in xrange(num_features):
         m = np.mean(X[:,i])
         s = np.std(X[:,i])
+        if s == 0:
+            s = m
+            m = 0
         mean_r.append(m)
         std_r.append(s)
         X_norm[:,i] = (X_norm[:,i]-m)/s
@@ -134,7 +137,7 @@ def compute_cost(X, Y, theta):
     return J
 
 def cross_validation(X, Y, fold):
-    batch_size = 1000 
+    batch_size = 240 
     num_points, num_features = X.shape
      
     validation_data = X[:batch_size,:] 
@@ -169,7 +172,7 @@ def gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learni
         if it%1000 == 0 :
             print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
             #print theta
-        if validation_cost > last_cost:
+        if it > 1000 and validation_cost > last_cost:
             print "Rebound"
             print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
             break
@@ -184,35 +187,45 @@ def batch_gradient_descent(X, Y, theta, learning_rate, iterations):
     theta, train_cost, validation_cost = gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate, iterations)
     return theta
 
+def expand_as_polynomial(X, test_X, p =  2):
+    num_points, num_features = X.shape
+    X_poly = np.array([np.ones(num_points)]).T
+    num_points, num_features = test_X.shape
+    test_X_poly = np.array([np.ones(num_points)]).T
+    for i in xrange(1,p+1):
+        X_poly = np.concatenate((X_poly, np.power(X,i)), axis=1)
+        test_X_poly = np.concatenate((test_X_poly, np.power(test_X,i)), axis=1)
+        
+    X, mean_r, std_r = normalize_feature(X_poly)
+    test_X = (test_X_poly - mean_r)/std_r
+        
+    num_points, num_features = X.shape
+    theta = np.zeros(num_features)
+
+    return X, test_X, theta 
+
 def run():
     iterations = 100001
-    learning_rate = 0.01
+    learning_rate = 0.001
     X, Y = readTrainingData()
+    test_X = readTestingData()
     #print X.shape, Y.shape
     #w, b = gradient_descent_v0(X, Y, learning_rate, iterations)
 
-    num_points, num_features = X.shape
-    X, mean_r, std_r = normalize_feature(X)
-    #print mean_r, std_r
-    bias = np.array([np.ones(num_points)]).T
-    X = np.concatenate((X, bias), axis=1)
-    theta = np.zeros(num_features+1)
-    print np.polyfit(X, Y, 2)
-    '''
-    theta = batch_gradient_descent(X, Y, theta, learning_rate, iterations)
-    
-    testing_data = readTestingData()
-    #print testing_data.shape
-    num_points, num_features = testing_data.shape
-    normalized_testing_data = (testing_data - mean_r)/std_r
+    X, test_X, theta = expand_as_polynomial(X, test_X, 2)
+   
 
-    bias = np.array([np.ones(num_points)]).T
-    X_testing = np.concatenate((normalized_testing_data, bias), axis=1)
-    
-    predict = (X_testing).dot(theta)
-    
+    theta = batch_gradient_descent(X, Y, theta, learning_rate, iterations)
+   
+    predict = (test_X).dot(theta)
     write_to_file(predict, "kaggle_best.csv")
-    '''
 
 if __name__ == '__main__':
     run()
+
+
+
+
+
+
+
