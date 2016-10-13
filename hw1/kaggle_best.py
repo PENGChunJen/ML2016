@@ -1,8 +1,8 @@
 import numpy as np
 import csv
-import cma
+#import cma
 import pickle
-from matplotlib import pyplot
+#from matplotlib import pyplot
 
 def readTrainingData():
     X = []
@@ -26,8 +26,15 @@ def readTrainingData():
     for i in xrange(1,5752,1):
         X.append(a[:,i:i+9].reshape(162))
         Y.append(a[9,i+9])
-    
-    return np.array(X).astype(np.float), np.array(Y).astype(np.float)
+    x = np.array(X).astype(np.float)#,np.array([[1,2],[4,5],[7,8]])
+    y = np.array(Y).astype(np.float)#np.array([3,6,9])
+   
+    c = np.concatenate((x,y.reshape(1,y.shape[0]).T), axis=1)
+    np.random.shuffle(c)
+    x = c[:,:-1]
+    y = c[:,-1:].flatten()
+    return x, y
+    #return np.array(X).astype(np.float), np.array(Y).astype(np.float)
 
 def readTestingData():
     testing_data = []
@@ -164,27 +171,35 @@ def run_gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, le
 
 def gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate=0.01, iterations=10001):
     #num_points, num_features = train_X.shape
-    delta = 0.000001
-    last_cost = float('Inf')
+    delta = 1e-11
+    max_explore = float('Inf') 
+    #max_explore = 100
+    cost_save_point = float('Inf')
     final_it = 0
+    count = 0
     for it in xrange(iterations):
         theta, train_cost, validation_cost = run_gradient_descent(train_X, train_Y, validation_X, validation_Y, theta, learning_rate)
         
-        if it%1000 == 0 :
-            #print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
-            if abs(last_cost - validation_cost) < delta or validation_cost > 1000000:
-                #print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
-                break
-
-        if it > 1000 and validation_cost > last_cost:
-            #print "Rebound"
-            #print("Iteration %5d | Train Cost: %f | Validation Cost: %f " %(it, train_cost, validation_cost))
+        if abs(cost_save_point - validation_cost) < delta or validation_cost > 1000000:
+            print("Iteration %5d | Train Cost: %.10f | Validation Cost: %.10f " %(it, train_cost, validation_cost))
             final_it = it
             break
-
         
-        last_cost = validation_cost
-
+        if it%1000 == 0 :
+            print("Iteration %5d | Train Cost: %.10f | Validation Cost: %.10f | count: %d" %(it, train_cost, validation_cost, count))
+            if count > max_explore:
+                count = 0
+                learning_rate = learning_rate/10
+                print('Adjust learning_rate to %.10f' %(learning_rate))
+            elif validation_cost > cost_save_point :
+                learning_rate = learning_rate/10
+                theta = theta_save_point
+                count = 0
+                print('Adjust learning_rate to %.10f, theta row back to iteration %d' %(learning_rate, it-1000))
+            else:
+                count += 1 
+                theta_save_point = theta
+            cost_save_point = validation_cost
     
     return theta, train_cost, validation_cost, final_it
 
@@ -195,14 +210,18 @@ def cross_validation(X, Y, learning_rate, iterations, fold = 5):
         validation_value = Y[:num_points/10]
         train_data = X[num_points/10:,:]
         train_value = Y[num_points/10:]
+        #validation_data = X[:500,:] 
+        #validation_value = Y[:500]
+        #train_data = X[500:,:]
+        #train_value = Y[500:]
         batch = [(train_data, train_value, validation_data, validation_value)]
     else: 
         batch = split_to_N_fold(X, Y, fold)
     avg_theta = np.zeros(num_features)
     avg_cost = 0.
     for i in xrange(len(batch)):
-        #theta = np.zeros(num_features)
-        theta = np.random.rand(num_features)
+        theta = np.zeros(num_features)
+        #theta = np.random.rand(num_features)
         
         train_X, train_Y, validation_X, validation_Y = batch[i]
         #print X.shape, train_X.shape, validation_X.shape
@@ -245,7 +264,7 @@ def sequential_forward_selection(X, Y, test_X, features = None):
     # Parameter setting
     max_iterations = 1000001
     learning_rate = 0.01
-    fold = -1 
+    fold = 10 
     selected_features = [] 
     num_points, num_features = X.shape
     last_cost = float('INF') 
@@ -282,16 +301,17 @@ def sequential_forward_selection(X, Y, test_X, features = None):
         print '\nCurrently selected inputs: feature:', selected_features, 'cost:',cost, '\n'
     return X, test_X
 
-def run(learning_rate):
-    print 'learning_rate:',learning_rate
+def run():
+    #print 'learning_rate:',learning_rate
     # Parameter setting
     max_iterations = 10000001
-    #learning_rate = 0.001
-    fold = 10 
+    learning_rate = 0.01
+    fold = 10
 
     X, Y = readTrainingData()
     test_X = readTestingData()
-    X, test_X = expand_as_polynomial(X, test_X, 1)
+    X, test_X = expand_as_polynomial(X, test_X, 1) # add bias, poly = 0
+    #X, test_X = expand_as_polynomial(X, test_X, poly)
 
     # SFS
     #selected_features = None
@@ -311,23 +331,25 @@ def run(learning_rate):
 
     avg_theta, avg_cost = cross_validation(selected_X, Y, learning_rate, max_iterations, fold)
     print '10 fold cross-validation cost:', avg_cost, selected_features
-    #predict = (selected_test_X).dot(avg_theta)
+    predict = (selected_test_X).dot(avg_theta)
     #write_to_file(predict, ""+str(avg_cost)+"_"+str(learning_rate)+".csv")
+    write_to_file(predict, "kaggle_best.csv")
     return avg_cost
 
 def plot_learning_rate():
-    learning_rate = np.arange(0.001,0.01,0.001)
+    learning_rate = np.arange(0.001,0.1,0.005)
     cost_history = []
     data = []
+    #data = pickle.load(open('learning_rate', 'rb')) 
     for l in learning_rate:
         cost = run(l)
         cost_history.append(cost)
         data.append({'learning_rate':l, 'cost':cost})
-    pickle.dump(data, open('learning_rate', 'wb'))
-    pyplot.plot(learning_rate, cost_history) 
-    pyplot.xlabel('learning rate')
-    pyplot.ylabel('loss')
-    pyplot.savefig('tuning_learning_rate1.png')
+    pickle.dump(data, open('new_feature_learning_rate', 'wb'))
+    #pyplot.plot(learning_rate, cost_history) 
+    #pyplot.xlabel('learning rate')
+    #pyplot.ylabel('loss')
+    #pyplot.savefig('tuning_learning_rate1.png')
 
 def run_CMAES(x, *args):
     learning_rate_history = []
@@ -337,8 +359,9 @@ def run_CMAES(x, *args):
     return cost_history 
     
 if __name__ == '__main__':
-    plot_learning_rate()
-    #run()
+   
+    run()
+    #plot_learning_rate()
     '''
     res = cma.fmin(run_CMAES, 2*[0.01], 0.01)
     print res[0]
