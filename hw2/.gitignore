@@ -1,0 +1,4 @@
+*.swp
+*.swo
+model*
+prediction.csv
