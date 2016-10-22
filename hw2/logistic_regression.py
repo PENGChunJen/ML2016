@@ -2,14 +2,17 @@ import sys, csv
 import numpy as np
 import cPickle as pickle
 
+
 def train_model(training_data):
     model = training_data 
     return model
+
 
 def predict(model, data):
     #labels = []
     labels = np.zeros(600)
     return labels
+
 
 def train(argv):
     training_file = argv[1]
@@ -22,6 +25,7 @@ def train(argv):
 
     with open(output_model, 'wb') as f:
         pickle.dump( model, f )
+
 
 def test(argv):
     model = pickle.load(open(argv[1], 'rb'))
@@ -37,13 +41,13 @@ def test(argv):
         for i in xrange(labels.shape[0]):
             f.write('%d,%d\n'%(i+1,labels[i]))
 
+
 if __name__ == '__main__':
     if len(sys.argv) == 3:
         train(sys.argv)
     elif len(sys.argv) == 4:
         test(sys.argv)
     else:
-        print 'ERROR!'
+        print 'INPUT FORMAT ERROR!'
         print 'Usage 1: ./train.sh <training data> <output model>'
         print 'Usage 2: ./test.sh <model name> <testing data> prediction.csv'
-
