@@ -72,7 +72,7 @@ def train_model(training_data):
     
     print 'Training data:', train_data.shape[0], ' Validation data:', val_data.shape[0]
     num = val_data.shape[0]
-    max_iterations = 300000
+    max_iterations = 3000
     DELTA = 1e-10
     learning_rate = 0.1
     last_val_cost = float('INF')
@@ -119,7 +119,7 @@ def predict(model, testing_data, threshold = 0.0):
         for i in xrange(labels.shape[0]):
             f.write('%d,%f\n'%(i+1,labels[i]))
 
-    labels = np.around(labels+threshold)
+    #labels = np.around(labels+threshold)
     #print 'labels',labels.shape, '\n',labels
     return labels
 
@@ -135,6 +135,34 @@ def train(argv):
     with open(output_model, 'wb') as f:
         pickle.dump( model, f )
 
+def sweepThreshold(model):
+    mean, std, theta = model
+    training_file = 'spam_data/spam_train.csv'
+    with open(training_file, 'rb') as f:
+        training_data = np.array(list(csv.reader(f))).astype(float)
+    num_features = 58
+    X = training_data[:,:num_features]
+    X_labels = training_data[:,num_features]
+    raw_labels = predict(model, X)
+    
+    threshold_diff = []
+    for i in xrange(500):
+        threshold = i/1000.0
+        labels = np.around(raw_labels+threshold)
+        diff = np.logical_xor(X_labels, labels).astype(int)
+        threshold_diff.append((threshold, sum(diff)))
+        #print threshold, sum(diff)
+    threshold, d = min(threshold_diff, key = lambda k: k[1])
+    print 'threshold:', threshold,'different training labels:', d, '/', X_labels.size
+    '''
+    labels = np.around(raw_labels+threshold)
+    diff = np.logical_xor(X_labels, labels).astype(int)
+    for i in xrange(len(diff)):
+        if diff[i]:
+            #print i, X_labels[i], labels[i], raw_labels[i]
+    '''
+    return threshold
+
 def test(argv):
     model = pickle.load(open(argv[1], 'rb'))
     testing_file = argv[2]
@@ -142,9 +170,11 @@ def test(argv):
     
     with open(testing_file, 'rb') as f:
         testing_data = np.array(list(csv.reader(f))).astype(float)
-
-    #labels = predict(model, testing_data)
-    labels = predict(model, testing_data, 0.11)
+    
+    threshold = sweepThreshold(model)
+    labels = predict(model, testing_data, threshold)
+    
+    labels = np.around(labels+threshold)
     with open(prediction, 'wb') as f:
         f.write('id,label\n')
         for i in xrange(labels.shape[0]):
