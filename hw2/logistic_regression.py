@@ -104,7 +104,7 @@ def train_model(training_data):
     model = mean, std, theta
     return model
 
-def predict(model, testing_data):
+def predict(model, testing_data, threshold = 0.0):
     mean, std, theta = model
     testing_data = testing_data[:,1:]
     num_points, num_features = testing_data.shape
@@ -119,7 +119,7 @@ def predict(model, testing_data):
         for i in xrange(labels.shape[0]):
             f.write('%d,%f\n'%(i+1,labels[i]))
 
-    labels = np.around(labels)
+    labels = np.around(labels+threshold)
     #print 'labels',labels.shape, '\n',labels
     return labels
 
@@ -143,7 +143,8 @@ def test(argv):
     with open(testing_file, 'rb') as f:
         testing_data = np.array(list(csv.reader(f))).astype(float)
 
-    labels = predict(model, testing_data)
+    #labels = predict(model, testing_data)
+    labels = predict(model, testing_data, 0.11)
     with open(prediction, 'wb') as f:
         f.write('id,label\n')
         for i in xrange(labels.shape[0]):
