@@ -64,17 +64,21 @@ def train_model(training_data):
     bias = np.array([np.ones(num_points)]).T
     X = np.concatenate((X, bias), axis=1)
     
-    fold = 5
-    train_data = X[:num_points/fold,:]
-    train_labels = X_labels[:num_points/fold]
-    val_data = X[num_points/fold:,:]
-    val_labels = X_labels[num_points/fold:]
+    fold = 10
+    train_data = X[num_points/fold:,:]
+    train_labels = X_labels[num_points/fold:]
+    val_data = X[:num_points/fold,:]
+    val_labels = X_labels[:num_points/fold]
     
-    max_iterations = 1000000000000
-    learning_rate = 0.0001
+    print 'Training data:', train_data.shape[0], ' Validation data:', val_data.shape[0]
+    num = val_data.shape[0]
+    max_iterations = 300000
+    DELTA = 1e-10
+    learning_rate = 0.1
     last_val_cost = float('INF')
-    #theta = np.ones(num_features)
-    theta = np.random.rand(num_features)
+    last_train_cost = float('INF')
+    theta = np.zeros(num_features)
+    #theta = np.random.rand(num_features)
     train_data, mean, std = normalize(train_data)
     val_data = (val_data - mean)/std
 
@@ -83,12 +87,19 @@ def train_model(training_data):
         theta, train_cost = logistic_regression(theta, learning_rate, train_data, train_labels)
         val_cost = compute_cost(theta, val_data, val_labels)
         if it%100 == 0 :
-            if it > 10000 and last_val_cost < val_cost:
-                print("Iteration %5d | Train Cost: %.10f | Validation Cost: %.10f" %(it, train_cost, val_cost))
+            if abs(last_train_cost-train_cost) < DELTA:
+                print("Iteration %5d | Train Cost: %.15f | Validation Cost: %.15f" %(it, train_cost, val_cost))
                 break
+            elif abs(last_val_cost - val_cost)*num < learning_rate*learning_rate:# or (it>1000 and last_val_cost > val_cost):
+                learning_rate = learning_rate/10
+                print("Iteration %5d | Train Cost: %.15f | Validation Cost: %.15f | alpha: %.15f" %(it, train_cost, val_cost, learning_rate))
+                theta = last_theta
+                val_cost = last_val_cost
+            else: 
+                print("Iteration %5d | Train Cost: %.15f | Validation Cost: %.15f" %(it, train_cost, val_cost))
+            last_train_cost = train_cost
             last_val_cost = val_cost
-            if it%1000 == 0:
-                print("Iteration %5d | Train Cost: %.10f | Validation Cost: %.10f" %(it, train_cost, val_cost))
+            last_theta = theta
 
     model = mean, std, theta
     return model
