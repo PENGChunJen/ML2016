@@ -71,14 +71,14 @@ def train_model(training_data):
     val_data = X[:num_points/fold,:]
     val_labels = X_labels[:num_points/fold]
     
-    print("Total Num:%10d | Train Data: %17d | Validation Data: %17d" %(X.shape[0], train_data.shape[0], val_data.shape[0]))
     num = val_data.shape[0]
-    max_iterations = 3000000 
-    DELTA = 1e-10
-    learning_rate = 0.0001
+    max_iterations = 100000 
+    DELTA = 1e-8
+    learning_rate = 0.0005
+    print("Total Num:%10d | Train Data: %12d | Validation Data: %12d | alpha: %.10f" %(X.shape[0], train_data.shape[0], val_data.shape[0], learning_rate))
 
-    #theta = np.zeros(num_features)
-    theta = np.random.rand(num_features)
+    theta = np.zeros(num_features)
+    #theta = np.random.rand(num_features)
     train_data, mean, std = normalize(train_data)
     val_data = (val_data - mean)/std
 
@@ -88,34 +88,32 @@ def train_model(training_data):
     train_cost_hist = []
     val_cost_hist = []
 
-    #for it in xrange(max_iterations):
-    it = -1 
-    while True:
-        it = it+1
+    for it in xrange(max_iterations):
         theta, train_cost = logistic_regression(theta, learning_rate, train_data, train_labels)
         val_cost = compute_cost(theta, val_data, val_labels)
+        
+        
         if it%1000 == 0 :
+            model = mean, std, theta
+            threshold, diff = sweepThreshold(model)
+            
             if abs(last_train_cost-train_cost) < DELTA: #converge
-                print("Iteration %10d | Train Cost: %.15f | Validation Cost: %.15f" %(it, train_cost, val_cost))
+                print("Iteration %10d | Train Cost: %.10f | Validation Cost: %.10f | thres: %.3f | diff: %4d " %(it, train_cost, val_cost, threshold, diff))
                 break
+            '''
             #elif abs(last_train_cost - train_cost)*num < learning_rate*learning_rate or ((it - last_it)>10000 and last_val_cost < val_cost):
             elif (it - last_it)>2000 and last_val_cost < val_cost:
                 learning_rate = learning_rate/10
-                last_it = it
-                if abs(last_train_cost - train_cost)*num < learning_rate*learning_rate:
-                    print 'last_train_cost:', last_train_cost, 'train_cost:', train_cost
-                if last_val_cost < val_cost:
-                    print 'last_val_cost:', last_val_cost, 'val_cost:', val_cost
-                print("Iteration %10d | Train Cost: %.15f | Validation Cost: %.15f | alpha: %.15f" %(it, train_cost, val_cost, learning_rate))
-                theta = last_theta
                 #val_cost = last_val_cost
-            else: 
-                print("Iteration %10d | Train Cost: %.15f | Validation Cost: %.15f" %(it, train_cost, val_cost))
+                last_it = it
+                print("Iteration %10d | Train Cost: %.10f | Validation Cost: %.10f | thres: %.3f | diff: %4d | alpha: %.10f" %(it, train_cost, val_cost, threshold, diff, learning_rate))
+            '''
+            print("Iteration %10d | Train Cost: %.10f | Validation Cost: %.10f | thres: %.3f | diff: %4d " %(it, train_cost, val_cost, threshold, diff))
+            
             train_cost_hist.append((it, train_cost))
             val_cost_hist.append((it, val_cost))
             last_train_cost = train_cost
             last_val_cost = val_cost
-            last_theta = theta
 
     with open('train_cost_history', 'wb') as f:
         pickle.dump( train_cost_hist, f )
@@ -174,7 +172,7 @@ def sweepThreshold(model):
         threshold_diff.append((threshold, sum(diff)))
         #print threshold, sum(diff)
     threshold, d = min(threshold_diff, key = lambda k: k[1])
-    print 'threshold:', threshold,'different training labels:', d, '/', X_labels.size
+    #print 'threshold:', threshold,'different training labels:', d, '/', X_labels.size
     '''
     labels = np.around(raw_labels+threshold)
     diff = np.logical_xor(X_labels, labels).astype(int)
@@ -182,7 +180,7 @@ def sweepThreshold(model):
         if diff[i]:
             #print i, X_labels[i], labels[i], raw_labels[i]
     '''
-    return threshold
+    return threshold, d
 
 def test(argv):
     model = pickle.load(open(argv[1], 'rb'))
@@ -192,7 +190,8 @@ def test(argv):
     with open(testing_file, 'rb') as f:
         testing_data = np.array(list(csv.reader(f))).astype(float)
     
-    threshold = sweepThreshold(model)
+    threshold, diff = sweepThreshold(model)
+    print 'threshold:', threshold,'different training labels:', diff
     labels = predict(model, testing_data, threshold)
     
     labels = np.around(labels+threshold)
