@@ -39,7 +39,8 @@ def logistic_regression(theta, learning_rate, X, Y):
     Z = sigmoid(X.dot(theta))
     loss = cross_entropy(Z, Y)
     cost = sum(loss)/num_points
-    gradient = np.dot((Z - Y),X)/num_points
+    #gradient = np.dot((Z - Y),X)/num_points
+    gradient = np.dot((Z - Y),X)
     theta = theta - learning_rate * gradient
     ''' 
     #np.set_printoptions(threshold='nan')
@@ -70,37 +71,57 @@ def train_model(training_data):
     val_data = X[:num_points/fold,:]
     val_labels = X_labels[:num_points/fold]
     
-    print 'Training data:', train_data.shape[0], ' Validation data:', val_data.shape[0]
+    print("Total Num:%10d | Train Data: %17d | Validation Data: %17d" %(X.shape[0], train_data.shape[0], val_data.shape[0]))
     num = val_data.shape[0]
-    max_iterations = 3000
+    max_iterations = 3000000 
     DELTA = 1e-10
-    learning_rate = 0.1
-    last_val_cost = float('INF')
-    last_train_cost = float('INF')
-    theta = np.zeros(num_features)
-    #theta = np.random.rand(num_features)
+    learning_rate = 0.0001
+
+    #theta = np.zeros(num_features)
+    theta = np.random.rand(num_features)
     train_data, mean, std = normalize(train_data)
     val_data = (val_data - mean)/std
 
+    last_val_cost = float('INF')
+    last_train_cost = float('INF')
+    last_it = 0
+    train_cost_hist = []
+    val_cost_hist = []
 
-    for it in xrange(max_iterations):
+    #for it in xrange(max_iterations):
+    it = -1 
+    while True:
+        it = it+1
         theta, train_cost = logistic_regression(theta, learning_rate, train_data, train_labels)
         val_cost = compute_cost(theta, val_data, val_labels)
-        if it%100 == 0 :
-            if abs(last_train_cost-train_cost) < DELTA:
-                print("Iteration %5d | Train Cost: %.15f | Validation Cost: %.15f" %(it, train_cost, val_cost))
+        if it%1000 == 0 :
+            if abs(last_train_cost-train_cost) < DELTA: #converge
+                print("Iteration %10d | Train Cost: %.15f | Validation Cost: %.15f" %(it, train_cost, val_cost))
                 break
-            elif abs(last_val_cost - val_cost)*num < learning_rate*learning_rate:# or (it>1000 and last_val_cost > val_cost):
+            #elif abs(last_train_cost - train_cost)*num < learning_rate*learning_rate or ((it - last_it)>10000 and last_val_cost < val_cost):
+            elif (it - last_it)>2000 and last_val_cost < val_cost:
                 learning_rate = learning_rate/10
-                print("Iteration %5d | Train Cost: %.15f | Validation Cost: %.15f | alpha: %.15f" %(it, train_cost, val_cost, learning_rate))
+                last_it = it
+                if abs(last_train_cost - train_cost)*num < learning_rate*learning_rate:
+                    print 'last_train_cost:', last_train_cost, 'train_cost:', train_cost
+                if last_val_cost < val_cost:
+                    print 'last_val_cost:', last_val_cost, 'val_cost:', val_cost
+                print("Iteration %10d | Train Cost: %.15f | Validation Cost: %.15f | alpha: %.15f" %(it, train_cost, val_cost, learning_rate))
                 theta = last_theta
-                val_cost = last_val_cost
+                #val_cost = last_val_cost
             else: 
-                print("Iteration %5d | Train Cost: %.15f | Validation Cost: %.15f" %(it, train_cost, val_cost))
+                print("Iteration %10d | Train Cost: %.15f | Validation Cost: %.15f" %(it, train_cost, val_cost))
+            train_cost_hist.append((it, train_cost))
+            val_cost_hist.append((it, val_cost))
             last_train_cost = train_cost
             last_val_cost = val_cost
             last_theta = theta
 
+    with open('train_cost_history', 'wb') as f:
+        pickle.dump( train_cost_hist, f )
+    with open('val_cost_history', 'wb') as f:
+        pickle.dump( val_cost_hist, f )
+    
     model = mean, std, theta
     return model
 
