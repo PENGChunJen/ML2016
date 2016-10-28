@@ -72,7 +72,7 @@ def train_model(training_data):
     val_labels = X_labels[:num_points/fold]
     
     num = val_data.shape[0]
-    max_iterations = 1000000 
+    max_iterations = 100000 
     DELTA = 1e-8
     learning_rate = 0.0005
     print("Total Num:%10d | Train Data: %12d | Validation Data: %12d | alpha: %.10f" %(X.shape[0], train_data.shape[0], val_data.shape[0], learning_rate))
