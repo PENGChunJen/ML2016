@@ -1,4 +1,5 @@
 *.swp
 *.swo
-model*
+results/*
+run.sh
 prediction.csv
