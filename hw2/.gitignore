@@ -1,4 +1,5 @@
 *.swp
 *.pyc
+run.sh
 results/*
 prediction.csv
