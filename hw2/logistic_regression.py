@@ -72,7 +72,7 @@ def train_model(training_data):
     val_labels = X_labels[:num_points/fold]
     
     num = val_data.shape[0]
-    max_iterations = 100000 
+    max_iterations = 1000000 
     DELTA = 1e-8
     learning_rate = 0.0005
     print("Total Num:%10d | Train Data: %12d | Validation Data: %12d | alpha: %.10f" %(X.shape[0], train_data.shape[0], val_data.shape[0], learning_rate))
@@ -115,10 +115,10 @@ def train_model(training_data):
             last_train_cost = train_cost
             last_val_cost = val_cost
 
-    with open('train_cost_history', 'wb') as f:
-        pickle.dump( train_cost_hist, f )
-    with open('val_cost_history', 'wb') as f:
-        pickle.dump( val_cost_hist, f )
+    #with open('train_cost_history', 'wb') as f:
+    #    pickle.dump( train_cost_hist, f )
+    #with open('val_cost_history', 'wb') as f:
+    #    pickle.dump( val_cost_hist, f )
     
     model = mean, std, theta
     return model
@@ -133,10 +133,10 @@ def predict(model, testing_data, threshold = 0.0):
     X = (X - mean)/std
     
     labels = sigmoid(X.dot(theta))
-    with open('raw_labels.csv', 'wb') as f:
-        f.write('id,label\n')
-        for i in xrange(labels.shape[0]):
-            f.write('%d,%f\n'%(i+1,labels[i]))
+    #with open('raw_labels.csv', 'wb') as f:
+    #    f.write('id,label\n')
+    #    for i in xrange(labels.shape[0]):
+    #        f.write('%d,%f\n'%(i+1,labels[i]))
 
     #labels = np.around(labels+threshold)
     #print 'labels',labels.shape, '\n',labels
