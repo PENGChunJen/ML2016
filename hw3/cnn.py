@@ -1,184 +1,200 @@
-import sys, csv
+import sys
 import numpy as np
-import numpy.ma as ma
 import cPickle as pickle
+from keras.models import Sequential, Model, load_model
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D
+from keras.layers import Input, Dense, Activation, Dropout, Flatten
+from keras.optimizers import SGD, Adam, Adadelta
 
-def normalize(X):
-    mean_r = [] 
-    std_r = []
-    X_norm = X
-    num_features = X.shape[1]
-    for i in xrange(num_features):
-        m = np.mean(X[:,i])
-        s = np.std(X[:,i])
-        if s == 0:
-            s = m
-            m = 0
-        mean_r.append(m)
-        std_r.append(s)
-        X_norm[:,i] = (X_norm[:,i]-m)/s
-    return X_norm, np.array([mean_r]), np.array([std_r])
+from sklearn.model_selection import cross_val_score, KFold
+from sklearn.utils import shuffle
 
-def sigmoid(z):
-    # Numerically-stable sigmoid function
-    return np.exp(-np.logaddexp(0,-z))
-    #return 1 / (1 + np.exp(-z))
+def load_label_data (file_name):
+    all_label = np.array(pickle.load(open(file_name, 'rb')))
+    X_label = np.empty((5000, 32, 32, 3), dtype="float32")
+    Y_label = np.zeros((5000,10))
+    num = 0
 
-def cross_entropy(x, y):
-    # y is binary classification
-    return -( y*(ma.log(x).filled(0)) + (1-y)*(ma.log(1-x).filled(0)))
+    for i in xrange(all_label.shape[0]):
+        for j in xrange(all_label.shape[1]):
+            X_label[num] = all_label[i][j].reshape(3,32,32).transpose(1,2,0)/255.
+            Y_label[num][i] = 1 
+            num = num+1
 
-def compute_cost(theta, X, Y):
-    num_points, num_features = X.shape
-    Z = sigmoid(X.dot(theta))
-    loss = cross_entropy(Z, Y)
-    return sum(loss)/num_points
+    return shuffle(X_label, Y_label, random_state=0)
 
-def logistic_regression(theta, learning_rate, X, Y):
-    num_points, num_features = X.shape
-    Z = sigmoid(X.dot(theta))
-    loss = cross_entropy(Z, Y)
-    cost = sum(loss)/num_points
-    #gradient = np.dot((Z - Y),X)/num_points
-    gradient = np.dot((Z - Y),X)
-    theta = theta - learning_rate * gradient
-    ''' 
-    #np.set_printoptions(threshold='nan')
-    print 'X',X.shape,'\n', X
-    print 'Y',Y.shape,'\n', Y
-    print 'Z',Z.shape, '\n',Z
-    print 'theta', theta.shape, '\n', theta 
-    print 'gradient', gradient.shape, '\n', gradient 
-    print 'loss', loss.shape, '\n', loss 
-    print 'cost', train_cost
-    '''
-    return theta, cost
+
+def load_unlabel_data (file_name):
+    all_unlabel = np.array(pickle.load(open(file_name, 'rb')))
+    X_unlabel = np.empty((all_unlabel.shape[0], 32, 32, 3), dtype="float32")
+    for i in xrange(all_unlabel.shape[0]):
+        X_unlabel[i] = all_unlabel[i].reshape(3,32,32).transpose(1,2,0)/255.
+    return X_unlabel
+
+
+def add_train_data(X_train, Y_train, X_unlabel, Y_unlabel):
+    threshold = 0.7
+    labels = np.argmax( Y_unlabel, axis=1 )
+    examples = np.where( np.amax( Y_unlabel, axis=1 )  > threshold )
+    print ''
+    #print 'X_train.shape',X_train.shape
+    #print 'Y_train.shape',Y_train.shape
+    #print 'X_unlabel.shape:', X_unlabel.shape
+    #print 'Y_unlabel.shape:', Y_unlabel.shape
+    #print 'labels:', labels.shape, labels
+    print examples[0].shape[0], 'examples above threshold:', threshold
+
+    a = np.zeros(Y_unlabel.shape)
+    a[ examples, labels[examples] ] = 1
+
+    X_new = X_unlabel[examples]
+    Y_new = a[examples]
+    #print 'X_new.shape',X_new.shape
+    #print 'Y_new.shape',Y_new.shape
+
+    X_new_train = np.concatenate((X_train, X_new))
+    Y_new_train = np.concatenate((Y_train, Y_new))
+    #print 'X_new_train.shape',X_new_train.shape
+    #print 'Y_new_train.shape',Y_new_train.shape
+
+    return shuffle(X_new_train, Y_new_train, random_state=0)
    
 
-def train_model_old(training_data):
-    np.random.shuffle(training_data) 
-    num_points = training_data.shape[0]
-    num_features = 58
-    X = training_data[:,1:num_features]
-    X_labels = training_data[:,num_features]
-    
-    bias = np.array([np.ones(num_points)]).T
-    X = np.concatenate((X, bias), axis=1)
-    
-    fold = 10
-    train_data = X[num_points/fold:,:]
-    train_labels = X_labels[num_points/fold:]
-    val_data = X[:num_points/fold,:]
-    val_labels = X_labels[:num_points/fold]
-    
-    num = val_data.shape[0]
-    max_iterations = 100000 
-    DELTA = 1e-8
-    learning_rate = 0.0005
-    print("Total Num:%10d | Train Data: %12d | Validation Data: %12d | alpha: %.10f" %(X.shape[0], train_data.shape[0], val_data.shape[0], learning_rate))
+def train_model(X_train, Y_train):
+    model = Sequential()
+    model.add(Convolution2D(32, 3, 3, border_mode = 'same', 
+                            input_shape = (X_train.shape[1:])))
+    model.add(Activation('relu'))
+    model.add(Convolution2D(32, 3, 3))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size = (2, 2)))
+    model.add(Dropout(0.25))
 
-    theta = np.zeros(num_features)
-    #theta = np.random.rand(num_features)
-    train_data, mean, std = normalize(train_data)
-    val_data = (val_data - mean)/std
+    model.add(Convolution2D(64, 3, 3, border_mode = 'same')) 
+    model.add(Activation('relu'))
+    model.add(Convolution2D(64, 3, 3)) 
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size = (2, 2)))
+    model.add(Dropout(0.25))
 
-    last_val_cost = float('INF')
-    last_train_cost = float('INF')
-    last_it = 0
-    train_cost_hist = []
-    val_cost_hist = []
+    model.add(Flatten())
+    model.add(Dense(output_dim = 512))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(output_dim = 10))
+    model.add(Activation('softmax'))
 
-    for it in xrange(max_iterations):
-        theta, train_cost = logistic_regression(theta, learning_rate, train_data, train_labels)
-        val_cost = compute_cost(theta, val_data, val_labels)
-        
-        
-        if it%1000 == 0 :
-            model = mean, std, theta
-            threshold, diff = sweepThreshold(model)
-            
-            if abs(last_train_cost-train_cost) < DELTA: #converge
-                print("Iteration %10d | Train Cost: %.10f | Validation Cost: %.10f | thres: %.3f | diff: %4d " %(it, train_cost, val_cost, threshold, diff))
-                break
-            '''
-            #elif abs(last_train_cost - train_cost)*num < learning_rate*learning_rate or ((it - last_it)>10000 and last_val_cost < val_cost):
-            elif (it - last_it)>2000 and last_val_cost < val_cost:
-                learning_rate = learning_rate/10
-                #val_cost = last_val_cost
-                last_it = it
-                print("Iteration %10d | Train Cost: %.10f | Validation Cost: %.10f | thres: %.3f | diff: %4d | alpha: %.10f" %(it, train_cost, val_cost, threshold, diff, learning_rate))
-            '''
-            print("Iteration %10d | Train Cost: %.10f | Validation Cost: %.10f | thres: %.3f | diff: %4d " %(it, train_cost, val_cost, threshold, diff))
-            
-            train_cost_hist.append((it, train_cost))
-            val_cost_hist.append((it, val_cost))
-            last_train_cost = train_cost
-            last_val_cost = val_cost
+    #model.load_weights('model0_weights.h5')
 
-    #with open('train_cost_history', 'wb') as f:
-    #    pickle.dump( train_cost_hist, f )
-    #with open('val_cost_history', 'wb') as f:
-    #    pickle.dump( val_cost_hist, f )
+    #sgd = SGD(lr = 0.01, decay = 1e-6, momentum=0.9, nesterov = True)
+    adadelta = Adadelta(lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0)
+    #adam = Adam(lr=0.001, beta_1 = 0.9, beta_2=0.999, epsilon=1e-0, decay=0.0)
+
+    model.compile(loss = 'categorical_crossentropy', 
+                  optimizer = adadelta, metrics=['accuracy'])
     
-    model = mean, std, theta
+    model.fit( X_train, Y_train,
+               batch_size=32, 
+               nb_epoch=20,
+               shuffle=True,
+               verbose=1,
+               validation_split = 0.1 )
     return model
 
-def predict_old(model, testing_data, threshold = 0.0):
-    mean, std, theta = model
-    testing_data = testing_data[:,1:]
-    num_points, num_features = testing_data.shape
-    
-    bias = np.array([np.ones(num_points)]).T
-    X = np.concatenate((testing_data, bias), axis=1)
-    X = (X - mean)/std
-    
-    labels = sigmoid(X.dot(theta))
-    #with open('raw_labels.csv', 'wb') as f:
-    #    f.write('id,label\n')
-    #    for i in xrange(labels.shape[0]):
-    #        f.write('%d,%f\n'%(i+1,labels[i]))
 
-    #labels = np.around(labels+threshold)
-    #print 'labels',labels.shape, '\n',labels
-    return labels
+def train_model_weight(X_train, Y_train, model_weight_name):
+    model = Sequential()
+    model.add(Convolution2D(32, 3, 3, border_mode = 'same', 
+                            input_shape = (X_train.shape[1:])))
+    model.add(Activation('relu'))
+    model.add(Convolution2D(32, 3, 3))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size = (2, 2)))
+    model.add(Dropout(0.25))
 
-def train_model( all_label, all_unlabel ):
-    # all_label[class_id(0-9)][image_id(0-499)] = [1024, 1024, 1024]
-    # all_unlabel[image_id(0-44999)] = [1024, 1024, 1024]
-    print 'all_label', all_label[0][0]
-    print 'all_unlabel', all_unlabel[0]
-    model = []
+    model.add(Convolution2D(64, 3, 3, border_mode = 'same')) 
+    model.add(Activation('relu'))
+    model.add(Convolution2D(64, 3, 3)) 
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size = (2, 2)))
+    model.add(Dropout(0.25))
+
+    model.add(Flatten())
+    model.add(Dense(output_dim = 512))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(output_dim = 10))
+    model.add(Activation('softmax'))
+    
+    model.load_weights(model_weight_name)
+
+    #sgd = SGD(lr = 0.01, decay = 1e-6, momentum=0.9, nesterov = True)
+    #adadelta = Adadelta(lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0)
+    adam = Adam(lr=0.001, beta_1 = 0.9, beta_2=0.999, epsilon=1e-0, decay=0.0)
+
+    model.compile(loss = 'categorical_crossentropy', 
+                  optimizer = adam, metrics=['accuracy'])
+    
+    model.fit( X_train, Y_train,
+               batch_size=32, 
+               nb_epoch=5,
+               shuffle=True,
+               verbose=1,
+               validation_split = 0.1 )
+               #validation_data = (X_val, Y_val))
     return model
 
 def predict(model, test):
-    # test['ID'][i(0-9999)] = image_id
-    # test['data'][i(0-9999)] = [1024, 1024, 1024]
-    print "test['ID'][0]", test['ID'][0]
-    print "test['data'][0]", test['data'][0]
     labels = np.zeros(10000)
     return labels
 
 def train(argv):
     dir_path = argv[1]
-    output_model = argv[2]
+    model_name = argv[2]
+    print 'Loading all_label.p ...'
+    X_train, Y_train = load_label_data(dir_path+'/all_label.p')
     
-    all_label = pickle.load(open(dir_path+'/all_label.p', 'rb'))
-    all_unlabel = pickle.load(open(dir_path+'/all_unlabel.p', 'rb'))
-    #test = pickle.load(open(dir_path+'/test.p', 'rb'))
-    
-    model = train_model( all_label, all_unlabel ) 
+    #model = train_model(X_train, Y_train)
+    #model.save_weights('model_weights.h5')
+    #model = load_model('model0.h5')
+    model = load_model(model_name)
 
-    with open(output_model, 'wb') as f:
-        pickle.dump( model, f )
+    print 'Loading all_unlabel.p ...'
+    X_unlabel = load_unlabel_data(dir_path+'/all_unlabel.p')
+    
+    for repeat in xrange(10):
+        print 'Predicting all_unlabel.p ...'
+        Y_unlabel = model.predict(X_unlabel, batch_size=32, verbose=1)
+        X_new_train, Y_new_train = add_train_data(X_train, Y_train, X_unlabel, Y_unlabel)
+        model = train_model_weight(X_new_train, Y_new_train, 'model_weights.h5')
+        model.save_weights('model_weights.h5')
+        model.save(model_name)
+
+
+    #kf = KFold(n_splits = 10)
+    #for train, val in kf.split(X_label):
+        #X_train, Y_train, X_val, Y_val = X_label[train], Y_label[train], X_label[val], Y_label[val]
+        #simple_model = train_model(X_train, Y_train, X_val, Y_val)
 
 def test(argv):
     dir_path = argv[1]
-    model = pickle.load(open(argv[2], 'rb'))
+    model_name = argv[2]
+    #model_name = 'model0.h5'
     prediction = argv[3]
     
+    print 'Loading test.p ...'
+    # test['data'][i(0-9999)] = [1024, 1024, 1024]
     test = pickle.load(open(dir_path+'/test.p', 'rb'))
+    all_unlabel = np.array(test['data'])
+    X_unlabel = np.empty((all_unlabel.shape[0], 32, 32, 3), dtype="float32")
+    for i in xrange(all_unlabel.shape[0]):
+        X_unlabel[i] = all_unlabel[i].reshape(3,32,32).transpose(1,2,0)/255.
+
+    print 'Predicting test.p ...'
+    model = load_model(model_name)
+    Y_unlabel = model.predict(X_unlabel, batch_size=32, verbose=1)
     
-    labels = predict(model, test)
+    labels = np.argmax(Y_unlabel, axis=1)
     
     with open(prediction, 'wb') as f:
         f.write('ID,class\n')
