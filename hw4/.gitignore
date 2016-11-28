@@ -2,3 +2,4 @@
 *.swp
 data/*
 run.sh
+output.csv
